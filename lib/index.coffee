@@ -105,9 +105,21 @@ module.exports = (opts) ->
 
     fetch_content = (type) ->
       W(
-        client.entries(
-          _.merge(type.filters, content_type: type.id, include: 10)
+        fetch_content_page(
+          _.merge(type.filters, content_type: type.id, include: 10), 0, 100
         )
+      )
+
+    fetch_content_page = (params, skip, limit) ->
+      all_entries = [];
+      client.entries(
+        _.merge(params, skip: skip, limit: limit)
+      ).then((entries) =>
+        all_entries.push.apply(all_entries, entries);
+        if entries.length >= limit
+          remaining_entries = fetch_content_page(params, skip + limit, limit)
+          all_entries.push.apply(all_entries, remaining_entries);
+        W.resolve all_entries
       )
 
     ###*
