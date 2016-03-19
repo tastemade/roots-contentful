@@ -104,22 +104,24 @@ module.exports = (opts) ->
     ###
 
     fetch_content = (type) ->
+      limit = type.filters?.limit || 100
       W(
-        fetch_content_page(
-          _.merge(type.filters, content_type: type.id, include: 10), 0, 100
+        client.entries(
+          _.merge(type.filters, {content_type: type.id, skip: 0})
         )
-      )
-
-    fetch_content_page = (params, skip, limit) ->
-      all_entries = [];
-      client.entries(
-        _.merge(params, skip: skip, limit: limit)
-      ).then((entries) =>
-        all_entries.push.apply(all_entries, entries);
-        if entries.length >= limit
-          remaining_entries = fetch_content_page(params, skip + limit, limit)
-          all_entries.push.apply(all_entries, remaining_entries);
-        W.resolve all_entries
+        .then (entries) ->
+          pages = []
+          skip = limit
+          while skip < entries.total
+            pages.push client.entries(_.merge(type.filters, {content_type: type.id, skip: skip}))
+            skip += limit
+          
+          W
+          .all(pages)
+          .then (fetched_pages) ->
+            for fetched_page in fetched_pages
+              entries.push.apply(entries, fetched_page)
+            return entries
       )
 
     ###*
