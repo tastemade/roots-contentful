@@ -6,6 +6,7 @@ contentful  = require 'contentful'
 pluralize   = require 'pluralize'
 RootsUtil   = require 'roots-util'
 querystring = require 'querystring'
+fs          = require 'fs'
 
 errors =
   no_token: 'Missing required options for roots-contentful. Please ensure
@@ -91,8 +92,9 @@ module.exports = (opts) ->
     ###
 
     get_all_content = (types) ->
-      W.map types, (t) ->
-        fetch_content(t)
+
+      W.map types, (t) =>
+        fetch_content(t, @roots.config.output_path())
           .then(format_content)
           .then((c) -> t.content = c)
           .yield(t)
@@ -103,9 +105,20 @@ module.exports = (opts) ->
      * @return {Promise} - returns response from Contentful API
     ###
 
-    fetch_content = (type) ->
+    fetch_content = (type, output_path) ->
+      output_path = path.join(output_path, type.write)
+      if type.write and fs.existsSync(output_path)
+        return W.promise((resolve, reject) ->
+          fs.readFile(output_path, (err, data) ->
+            if err
+              return reject(err)
+            entries = JSON.parse data
+            resolve entries
+          )  
+        )
+        
       limit = type.filters?.limit || 100
-      W(
+      return W(
         client.entries(
           _.merge(type.filters, {content_type: type.id, skip: 0})
         )
